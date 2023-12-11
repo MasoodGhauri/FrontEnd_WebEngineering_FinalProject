@@ -1,7 +1,11 @@
 import './App.css';
-import Example from './Example';
+import './Masood.css';
+import './Saaram.css';
+import './Adnan.css';
+
 
 function App() {
+
   return (
     <div className="App">
       <h2>App.js fjknvnan vnf akjnv </h2>
