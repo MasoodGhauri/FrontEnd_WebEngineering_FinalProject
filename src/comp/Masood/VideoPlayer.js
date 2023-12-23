@@ -8,12 +8,15 @@ const VideoPlayer = (props) => {
   }, []);
 
   return (
-    <video
-      style={{ width: "550px", height: "300px" }}
-      playsInline
-      autoPlay
-      ref={ref}
-    />
+    <div className="videoPlayerWrapper">
+      <video
+        style={{ width: "550px", height: "300px" }}
+        playsInline
+        autoPlay
+        ref={ref}
+      />
+      <h6>{props.userName}</h6>
+    </div>
   );
 };
 export default VideoPlayer;

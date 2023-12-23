@@ -5,6 +5,7 @@ import { useParams } from "react-router";
 import VideoPlayer from "./VideoPlayer";
 
 const Room = () => {
+  const user = sessionStorage.getItem("user");
   const [peers, setPeers] = useState([]);
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(true);
@@ -14,9 +15,10 @@ const Room = () => {
   const peersRef = useRef([]);
   const params = useParams();
   const roomID = params.roomID;
-  let flag = true;
   const [screenShare, setScreenShare] = useState(false);
   const screenTrackRef = useRef();
+  const [msg, setMsg] = useState("");
+  const [file, setFile] = useState(null);
 
   const enter = () => {
     socketRef.current = io.connect("http://localhost:3001");
@@ -26,24 +28,28 @@ const Room = () => {
         userVideo.current.srcObject = stream;
         userStream.current = stream;
         userVideo.current.muted = true;
+        window.addEventListener("popstate", leave);
+        window.addEventListener("beforeunload", leave);
 
-        socketRef.current.emit("b-join room", roomID);
+        socketRef.current.emit("b-join room", { roomID, userName: user });
         socketRef.current.on("f-users joined", (users) => {
           const temp = [];
 
-          users.forEach((userID) => {
+          users.forEach(({ id, userName }) => {
             // Check if the peer with the same ID is already in the peers state
-            const existingPeer = peers.find((peer) => peer.peerID === userID);
+            const existingPeer = peers.find((peer) => peer.peerID === id);
 
             if (!existingPeer) {
               // Peer is not already in the state, create a new one
-              const peer = createPeer(userID, socketRef.current.id, stream);
+              const peer = createPeer(id, socketRef.current.id, stream);
               peersRef.current.push({
-                peerID: userID,
+                peerID: id,
+                userName,
                 peer,
               });
               temp.push({
-                peerID: userID,
+                peerID: id,
+                userName,
                 peer,
               });
             } else {
@@ -54,7 +60,7 @@ const Room = () => {
           setPeers(temp);
         });
 
-        socketRef.current.on("f-get request", ({ signal, from }) => {
+        socketRef.current.on("f-get request", ({ signal, from, userName }) => {
           // Check if the peer with the same ID is already in the peers state
           const existingPeer = peers.find((peer) => peer.peerID === from);
 
@@ -64,10 +70,12 @@ const Room = () => {
             peersRef.current.push({
               peerID: from,
               peer,
+              userName,
             });
             const peerObj = {
               peer,
               peerID: from,
+              userName,
             };
 
             setPeers((users) => [...users, peerObj]);
@@ -81,17 +89,13 @@ const Room = () => {
           item.peer.signal(signal);
         });
 
-        // socketRef.current.on("user left", (id) => {
-        //   console.log("User left: " + id);
-        //   const peerObj = peersRef.current.find((p) => p.peerID === id);
-        //   if (peerObj) {
-        //     peerObj.peer.destroy();
-        //   }
-
-        //   const peers = peersRef.current.filter((p) => p.peerID !== id);
-        //   peersRef.current = peers;
-        //   setPeers(peers);
-        // });
+        socketRef.current.on(
+          "f-receive message",
+          ({ message, userName, time }) => {
+            console.log(message, userName, time);
+          }
+        );
+        socketRef.current.on("f-recieve file", recieveFile);
 
         socketRef.current.on("user left", (id) => {
           handleLeave(id);
@@ -111,6 +115,7 @@ const Room = () => {
         userToConnect,
         from,
         signal,
+        userName: user,
       });
     });
 
@@ -188,53 +193,94 @@ const Room = () => {
   };
 
   const handleLeave = (id) => {
-    if (flag) {
-      flag = false;
-      setTimeout(() => {
-        flag = true;
-      }, 1000);
-      console.log("User left: " + id);
-      console.log(peersRef.current);
-      console.log(peers);
-      const peerObj = peersRef.current.find((p) => p.peerID === id);
+    const peerObj = peersRef.current.find((p) => p.peerID === id);
 
-      console.log(peerObj);
-      if (peerObj) {
-        // Peer with the specified ID exists
+    if (peerObj) {
+      // Update peersRef.current and state to exclude the removed peer
+      const updatedPeers = peersRef.current.filter((p) => p.peerID !== id);
+      peerObj.peer.destroy();
+      peersRef.current = updatedPeers;
 
-        // Update peersRef.current and state to exclude the removed peer
-        const updatedPeers = peersRef.current.filter((p) => p.peerID !== id);
-        console.log(updatedPeers);
-        peerObj.peer.destroy();
-        peersRef.current = updatedPeers;
-
-        // let tempPeers = peers;
-        // tempPeers.forEach((p) => {
-        //   if (p.peerID === id) {
-        //     tempPeers.splice(tempPeers.indexOf(p), 1);
-        //   }
-        // });
-        // setPeers(tempPeers);
-        setPeers((prevPeers) => prevPeers.filter((p) => p.peerID !== id));
-        // setPeers(updatedPeers);
-      } else {
-        // Peer with the specified ID does not exist
-        console.log(`Peer with ID ${id} not found.`);
-      }
+      setPeers((prevPeers) => prevPeers.filter((p) => p.peerID !== id));
+    } else {
+      // Peer with the specified ID does not exist
+      console.log(`Peer with ID ${id} not found.`);
     }
+  };
+  const leave = (e) => {
+    e.preventDefault();
+    sessionStorage.removeItem("user");
+    window.location.href = "/";
+  };
+
+  const sendMessage = () => {
+    const time = getCurrentTime();
+    socketRef.current.emit("b-send message", {
+      message: msg,
+      roomID,
+      userName: user,
+      time,
+    });
+    setMsg("");
+  };
+  const getCurrentTime = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+
+    // Convert hours to 12-hour format
+    hours = hours % 12 || 12;
+
+    // Add leading zero to minutes if needed
+    minutes = minutes < 10 ? "0" + minutes : minutes;
+
+    const formattedTime = `${hours}:${minutes} ${ampm}`;
+
+    return formattedTime;
+  };
+
+  const sendFile = (e) => {
+    e.preventDefault();
+    if (file) {
+      let toSend = {
+        body: file,
+        user,
+        mimeType: file.type,
+        fileName: file.name,
+        time: getCurrentTime(),
+      };
+      socketRef.current.emit("b-send file", { roomID, body: toSend });
+      setFile(null);
+    }
+  };
+  const recieveFile = (data) => {
+    const blob = new Blob([data.body], { type: data.mimeType });
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = window.URL.createObjectURL(blob);
+    downloadLink.download = "filename";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
   };
 
   return (
     <div>
-      <video
-        style={{ width: "550px", height: "300px" }}
-        muted
-        ref={userVideo}
-        autoPlay
-        playsInline
-      />
+      <div>
+        <video
+          style={{ width: "550px", height: "300px" }}
+          muted
+          ref={userVideo}
+          autoPlay
+          playsInline
+        />
+        <h6>You: {user}</h6>
+      </div>
       {peers.map((p, key) => {
-        return <VideoPlayer key={p.peerID} peer={p.peer} />;
+        return (
+          <VideoPlayer key={p.peerID} peer={p.peer} userName={p.userName} />
+        );
       })}
       <button onClick={muteAudio}>Audio</button>
       <button onClick={muteVideo}>Video</button>
@@ -242,6 +288,14 @@ const Room = () => {
         {screenShare ? "Stop Screen Share" : "Start Screen Share"}
       </button>
       <button onClick={enter}>Enter</button>
+      <input
+        type="text"
+        placeholder="Enter message"
+        onChange={(e) => setMsg(e.target.value)}
+      />
+      <button onClick={sendMessage}>Send</button>
+      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      <button onClick={sendFile}>Send File</button>
     </div>
   );
 };
