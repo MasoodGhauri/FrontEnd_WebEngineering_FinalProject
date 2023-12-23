@@ -1,97 +1,105 @@
-import { useEffect, useRef, useState } from "react";
-import socket from "./Socket";
+import React, { useRef, useState } from "react";
+import io from "socket.io-client";
 import SimplePeer from "simple-peer";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import VideoPlayer from "./VideoPlayer";
 
 const Room = () => {
-  const localVideo = useRef();
-  const userStream = useRef();
-  const user = sessionStorage.getItem("user");
-  const { roomId } = useParams();
-  const [videoDevices, setVideoDevices] = useState([]);
-  const [remoteUsersVideoAudio, setRemoteUsersVideoAudio] = useState({
-    localUser: { video: true, audio: true },
-  });
   const [peers, setPeers] = useState([]);
+  const [micActive, setMicActive] = useState(true);
+  const [cameraActive, setCameraActive] = useState(true);
+  const socketRef = useRef();
+  const userVideo = useRef();
+  const userStream = useRef();
   const peersRef = useRef([]);
+  const params = useParams();
+  const roomID = params.roomID;
+  let flag = true;
+  const [screenShare, setScreenShare] = useState(false);
+  const screenTrackRef = useRef();
 
-  useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      const videoDevices = devices.filter(
-        (device) => device.kind === "videoinput"
-      );
-      setVideoDevices(videoDevices);
-    });
-
+  const enter = () => {
+    socketRef.current = io.connect("http://localhost:3001");
     navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+      .getUserMedia({ video: true, audio: false })
       .then((stream) => {
-        localVideo.current.srcObject = stream;
+        userVideo.current.srcObject = stream;
         userStream.current = stream;
+        userVideo.current.muted = true;
 
-        socket.emit("b-user join", { roomId, userName: user });
-        socket.on("f-users joined", (users) => {
-          const peers = [];
-          users.forEach(({ userId, info }) => {
-            let { userName, video, audio } = info;
+        socketRef.current.emit("b-join room", roomID);
+        socketRef.current.on("f-users joined", (users) => {
+          const temp = [];
 
-            if (userName !== user) {
-              const peer = createPeer(userId, socket.id, stream);
+          users.forEach((userID) => {
+            // Check if the peer with the same ID is already in the peers state
+            const existingPeer = peers.find((peer) => peer.peerID === userID);
 
-              peer.userName = userName;
-              peer.peerId = userId;
-
+            if (!existingPeer) {
+              // Peer is not already in the state, create a new one
+              const peer = createPeer(userID, socketRef.current.id, stream);
               peersRef.current.push({
-                peerID: userId,
+                peerID: userID,
                 peer,
-                userName,
               });
-              peers.push(peer);
-
-              setRemoteUsersVideoAudio((pre) => {
-                return {
-                  ...pre,
-                  [peer.userName]: { video, audio },
-                };
+              temp.push({
+                peerID: userID,
+                peer,
               });
+            } else {
+              // Peer is already in the state, push the existing one
+              temp.push(existingPeer);
             }
           });
-          setPeers(peers);
+          setPeers(temp);
         });
 
-        socket.on("f-get request", ({ signal, from, info }) => {
-          let { userName, video, audio } = info;
-          const peerIdx = peersRef.current.findIndex((p) => p.peerID === from);
-          if (peerIdx === -1) {
+        socketRef.current.on("f-get request", ({ signal, from }) => {
+          // Check if the peer with the same ID is already in the peers state
+          const existingPeer = peers.find((peer) => peer.peerID === from);
+
+          if (!existingPeer) {
+            // Peer is not already in the state, add a new peer
             const peer = addPeer(signal, from, stream);
-
-            peer.userName = userName;
-
             peersRef.current.push({
               peerID: from,
               peer,
-              userName,
             });
-            setPeers((pre) => [...pre, peer]);
-            setRemoteUsersVideoAudio((pre) => {
-              return {
-                ...pre,
-                [peer.userName]: { video, audio },
-              };
-            });
+            const peerObj = {
+              peer,
+              peerID: from,
+            };
+
+            setPeers((users) => [...users, peerObj]);
+          } else {
+            console.log(`Peer with ID ${from} already exists.`);
           }
         });
 
-        socket.on("f-accepted connect", ({ signal, answerId }) => {
-          peersRef.current
-            .find((p) => p.peerID === answerId)
-            .peer.signal(signal);
+        socketRef.current.on("f-accepted connect", ({ signal, id }) => {
+          const item = peersRef.current.find((p) => p.peerID === id);
+          item.peer.signal(signal);
+        });
+
+        // socketRef.current.on("user left", (id) => {
+        //   console.log("User left: " + id);
+        //   const peerObj = peersRef.current.find((p) => p.peerID === id);
+        //   if (peerObj) {
+        //     peerObj.peer.destroy();
+        //   }
+
+        //   const peers = peersRef.current.filter((p) => p.peerID !== id);
+        //   peersRef.current = peers;
+        //   setPeers(peers);
+        // });
+
+        socketRef.current.on("user left", (id) => {
+          handleLeave(id);
         });
       });
-  }, []);
+  };
 
-  const createPeer = (userId, from, stream) => {
+  const createPeer = (userToConnect, from, stream) => {
     const peer = new SimplePeer({
       initiator: true,
       trickle: false,
@@ -99,11 +107,11 @@ const Room = () => {
     });
 
     peer.on("signal", (signal) => {
-      socket.emit("b-request connect", { userToConnect: userId, from, signal });
-    });
-
-    peer.on("disconnect", () => {
-      peer.destroy();
+      socketRef.current.emit("b-request connect", {
+        userToConnect,
+        from,
+        signal,
+      });
     });
 
     return peer;
@@ -117,11 +125,7 @@ const Room = () => {
     });
 
     peer.on("signal", (signal) => {
-      socket.emit("b-accept connect", { signal, to: from });
-    });
-
-    peer.on("disconnect", () => {
-      peer.destroy();
+      socketRef.current.emit("b-accept connect", { signal, from });
     });
 
     peer.signal(incomingSignal);
@@ -129,12 +133,115 @@ const Room = () => {
     return peer;
   };
 
+  const muteAudio = () => {
+    setMicActive(!micActive);
+    userStream.current.getAudioTracks()[0].enabled =
+      !userStream.current.getAudioTracks()[0].enabled;
+  };
+
+  const muteVideo = () => {
+    setCameraActive(!cameraActive);
+    userStream.current.getVideoTracks()[0].enabled =
+      !userStream.current.getVideoTracks()[0].enabled;
+  };
+
+  const clickScreenSharing = () => {
+    if (!screenShare) {
+      navigator.mediaDevices
+        .getDisplayMedia({ cursor: true })
+        .then((stream) => {
+          const screenTrack = stream.getTracks()[0];
+
+          peersRef.current.forEach(({ peer }) => {
+            // replaceTrack (oldTrack, newTrack, oldStream);
+            peer.replaceTrack(
+              peer.streams[0]
+                .getTracks()
+                .find((track) => track.kind === "video"),
+              screenTrack,
+              userStream.current
+            );
+          });
+
+          // Listen click end
+          screenTrack.onended = () => {
+            peersRef.current.forEach(({ peer }) => {
+              peer.replaceTrack(
+                screenTrack,
+                peer.streams[0]
+                  .getTracks()
+                  .find((track) => track.kind === "video"),
+                userStream.current
+              );
+            });
+            userVideo.current.srcObject = userStream.current;
+            setScreenShare(false);
+          };
+
+          userVideo.current.srcObject = stream;
+          screenTrackRef.current = screenTrack;
+          setScreenShare(true);
+        });
+    } else {
+      screenTrackRef.current.onended();
+    }
+  };
+
+  const handleLeave = (id) => {
+    if (flag) {
+      flag = false;
+      setTimeout(() => {
+        flag = true;
+      }, 1000);
+      console.log("User left: " + id);
+      console.log(peersRef.current);
+      console.log(peers);
+      const peerObj = peersRef.current.find((p) => p.peerID === id);
+
+      console.log(peerObj);
+      if (peerObj) {
+        // Peer with the specified ID exists
+
+        // Update peersRef.current and state to exclude the removed peer
+        const updatedPeers = peersRef.current.filter((p) => p.peerID !== id);
+        console.log(updatedPeers);
+        peerObj.peer.destroy();
+        peersRef.current = updatedPeers;
+
+        // let tempPeers = peers;
+        // tempPeers.forEach((p) => {
+        //   if (p.peerID === id) {
+        //     tempPeers.splice(tempPeers.indexOf(p), 1);
+        //   }
+        // });
+        // setPeers(tempPeers);
+        setPeers((prevPeers) => prevPeers.filter((p) => p.peerID !== id));
+        // setPeers(updatedPeers);
+      } else {
+        // Peer with the specified ID does not exist
+        console.log(`Peer with ID ${id} not found.`);
+      }
+    }
+  };
+
   return (
-    <div className="roomWrapper">
-      <video ref={localVideo} muted autoPlay playsInline></video>
-      {peers.map((peer, index, arr) => (
-        <VideoPlayer key={index} peer={peer} number={arr.length} />
-      ))}
+    <div>
+      <video
+        style={{ width: "550px", height: "300px" }}
+        muted
+        ref={userVideo}
+        autoPlay
+        playsInline
+      />
+      {peers.map((p, key) => {
+        return <VideoPlayer key={p.peerID} peer={p.peer} />;
+      })}
+      <button onClick={muteAudio}>Audio</button>
+      <button onClick={muteVideo}>Video</button>
+      <button onClick={clickScreenSharing}>
+        {screenShare ? "Stop Screen Share" : "Start Screen Share"}
+      </button>
+      <button onClick={enter}>Enter</button>
     </div>
   );
 };

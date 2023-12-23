@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import socket from "./Socket";
 
 const CreateRoom = () => {
   const [username, setUserName] = useState("");
   const [roomId, setRoomId] = useState("");
-  const [flag, setFlag] = useState(true);
   const navigate = useNavigate();
 
   const generateRandomId = () => {
@@ -23,38 +21,24 @@ const CreateRoom = () => {
     return `${left}-${middle}-${right}`;
   };
 
-  const createRoom = () => {
-    // setRoomId(generateRandomId());
-    socket.emit("b-check user", { roomId, userName: username });
-    setFlag(false);
+  const joinRoom = () => {
+    sessionStorage.setItem("user", username);
+    navigate(`/room/${roomId}`);
   };
-
-  useEffect(() => {
-    socket.on("f-user not present", () => {
-      console.log(username);
-      sessionStorage.setItem("user", username);
-      navigate(`/room/${roomId}`);
-    });
-    socket.on("f-user present", () => {
-      console.log("error!!! user already present");
-    });
-  }, [flag]);
 
   return (
     <div className="createRoomWrapper">
       <input
         type="text"
-        name=""
         placeholder="room code"
         onChange={(e) => setRoomId(e.target.value)}
       />
       <input
         type="text"
-        name=""
         placeholder="username"
         onChange={(e) => setUserName(e.target.value)}
       />
-      <button onClick={createRoom}>Create Room</button>
+      <button onClick={joinRoom}>Join Room</button>
     </div>
   );
 };
