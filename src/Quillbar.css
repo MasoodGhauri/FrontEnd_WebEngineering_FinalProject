@@ -1,0 +1,31 @@
+.ql-toolbar.ql-snow {
+  background-color: #4ba815;
+  border-bottom: 1px solid #000000;
+}
+
+.ql-toolbar.ql-snow button {
+  color: #e64343;
+}
+
+.fileUpload {
+  margin-top: 15%;
+}
+.fileUpload .form-label {
+  font-weight: bold;
+}
+
+.btn.btn-primary {
+  margin-top: 5%;
+  width: 20%;
+  background-color: #6bc559;
+  color: #fff;
+  border: 1px solid #6bc559;
+  /* Add more styles as needed */
+}
+
+.btn.btn-primary:hover {
+  border: 1px solid #4ba815;
+  background-color: #4ba815;
+  color: #fff;
+  /* Add more styles for hover state as needed */
+}
