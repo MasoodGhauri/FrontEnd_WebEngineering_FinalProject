@@ -3,6 +3,11 @@ import io from "socket.io-client";
 import SimplePeer from "simple-peer";
 import { useParams } from "react-router";
 import VideoPlayer from "./VideoPlayer";
+import Controls from "./Controls";
+import Header from "./Header";
+import SideControls from "./SideControls";
+import SidePanel from "./SidePanel";
+import PopupModal from "./PopupModal";
 
 const Room = () => {
   const user = sessionStorage.getItem("user");
@@ -17,8 +22,8 @@ const Room = () => {
   const roomID = params.roomID;
   const [screenShare, setScreenShare] = useState(false);
   const screenTrackRef = useRef();
-  const [msg, setMsg] = useState("");
-  const [file, setFile] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [showSidePanel, setShowSidePanel] = useState(null);
 
   const enter = () => {
     socketRef.current = io.connect("http://localhost:3001");
@@ -92,7 +97,9 @@ const Room = () => {
         socketRef.current.on(
           "f-receive message",
           ({ message, userName, time }) => {
-            console.log(message, userName, time);
+            // console.log(message, userName, time);
+            let obj = { message, userName, time, file: false };
+            setMessages((prevMessages) => [obj, ...prevMessages]);
           }
         );
         socketRef.current.on("f-recieve file", recieveFile);
@@ -150,7 +157,7 @@ const Room = () => {
       !userStream.current.getVideoTracks()[0].enabled;
   };
 
-  const clickScreenSharing = () => {
+  const screenSharing = () => {
     if (!screenShare) {
       navigator.mediaDevices
         .getDisplayMedia({ cursor: true })
@@ -213,15 +220,16 @@ const Room = () => {
     window.location.href = "/";
   };
 
-  const sendMessage = () => {
-    const time = getCurrentTime();
-    socketRef.current.emit("b-send message", {
-      message: msg,
-      roomID,
-      userName: user,
-      time,
-    });
-    setMsg("");
+  const sendMessage = (msg) => {
+    if (msg !== "") {
+      const time = getCurrentTime();
+      socketRef.current.emit("b-send message", {
+        message: msg,
+        roomID,
+        userName: user,
+        time,
+      });
+    }
   };
   const getCurrentTime = () => {
     const now = new Date();
@@ -240,8 +248,7 @@ const Room = () => {
     return formattedTime;
   };
 
-  const sendFile = (e) => {
-    e.preventDefault();
+  const sendFile = (file) => {
     if (file) {
       let toSend = {
         body: file,
@@ -251,51 +258,97 @@ const Room = () => {
         time: getCurrentTime(),
       };
       socketRef.current.emit("b-send file", { roomID, body: toSend });
-      setFile(null);
     }
   };
   const recieveFile = (data) => {
-    const blob = new Blob([data.body], { type: data.mimeType });
+    let obj = {
+      message: data,
+      userName: data.user,
+      time: data.time,
+      file: true,
+    };
+    setMessages((prevMessages) => [obj, ...prevMessages]);
+  };
+  const toggleSidePanel = (target) => {
+    if (target === "Chats") {
+      if (showSidePanel === "Chats") {
+        setShowSidePanel(null);
+      } else {
+        setShowSidePanel(target);
+      }
+    } else {
+      if (showSidePanel === "People") {
+        setShowSidePanel(null);
+      } else {
+        setShowSidePanel(target);
+      }
+    }
+  };
+  const elementRef = useRef(null);
 
-    const downloadLink = document.createElement("a");
-    downloadLink.href = window.URL.createObjectURL(blob);
-    downloadLink.download = "filename";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+  const requestFullScreen = () => {
+    const element = elementRef.current;
+
+    if (element) {
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    }
   };
 
   return (
-    <div>
-      <div>
-        <video
-          style={{ width: "550px", height: "300px" }}
-          muted
-          ref={userVideo}
-          autoPlay
-          playsInline
-        />
-        <h6>You: {user}</h6>
+    <div className="roomWrapper">
+      <Header roomID={roomID} />
+      <div className="middleSection">
+        <SideControls toggleSidePanel={toggleSidePanel} />
+        {showSidePanel ? (
+          <SidePanel
+            people={peers}
+            showSidePanel={showSidePanel}
+            sendMessage={sendMessage}
+            sendFile={sendFile}
+            messages={messages}
+          />
+        ) : (
+          ""
+        )}
+        <div className="videosSectionWrapper">
+          <div className="videoPlayerWrapper" ref={elementRef}>
+            <video muted ref={userVideo} autoPlay playsInline />
+            <div className="videoBottom">
+              <h6>You: {user}</h6>
+              <span
+                className="material-symbols-outlined fullScreen"
+                onClick={requestFullScreen}
+              >
+                fullscreen
+              </span>
+            </div>
+          </div>
+          {peers.map((p, key) => {
+            return (
+              <VideoPlayer key={p.peerID} peer={p.peer} userName={p.userName} />
+            );
+          })}
+        </div>
       </div>
-      {peers.map((p, key) => {
-        return (
-          <VideoPlayer key={p.peerID} peer={p.peer} userName={p.userName} />
-        );
-      })}
-      <button onClick={muteAudio}>Audio</button>
-      <button onClick={muteVideo}>Video</button>
-      <button onClick={clickScreenSharing}>
-        {screenShare ? "Stop Screen Share" : "Start Screen Share"}
-      </button>
-      <button onClick={enter}>Enter</button>
-      <input
-        type="text"
-        placeholder="Enter message"
-        onChange={(e) => setMsg(e.target.value)}
+
+      <Controls
+        muteVideo={muteVideo}
+        cameraActive={cameraActive}
+        muteAudio={muteAudio}
+        micActive={micActive}
+        screenSharing={screenSharing}
+        screenShare={screenShare}
+        leave={leave}
       />
-      <button onClick={sendMessage}>Send</button>
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-      <button onClick={sendFile}>Send File</button>
+      <PopupModal enter={enter} />
     </div>
   );
 };
