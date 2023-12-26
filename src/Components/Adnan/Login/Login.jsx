@@ -2,18 +2,18 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import styles from "./Adnan.css";
+import useUserLoggedIn  from "../../hooks/useUserLoggedIn";
+
 
 const Login = () => {
   const [data, setData] = useState({ email: "", password: ""});
-  const [role, setRole] = useState("student"); // Default role is "student"
+  const [role, setRole] = useState(""); // Default role is "student"
   const [error, setError] = useState("");
+  const userhook = useUserLoggedIn();
   const navigate = useNavigate();
 
   const handleChange = ({ currentTarget: input }) => {
     setData({ ...data, [input.name]: input.value });
-  };
-
-  const handleRoleChange = () => {
   };
 
   const handleSubmit = async (e) => {
@@ -30,6 +30,7 @@ const Login = () => {
     	}),
       });
       const responseData = await response1.json();
+      console.log(responseData.role);
     setRole(responseData.role);
    //console.log(responseData.role);
 	try {
@@ -53,22 +54,14 @@ const Login = () => {
 	  }
   
 	  const responseData = await response.json();
-  
+    
 	  if (responseData.Success === true) {
 		console.log(responseData);
+
+    userhook.setUser({user: responseData.rest, token: responseData.token});
   
 		localStorage.setItem("token", responseData.token);
-		if(role === 'student')
-		navigate("/signup");
-		else if (role === 'teacher'){
-		navigate("/signup")
-		}
-    else if (role === 'admin'){ 
-      navigate("/signup")
-    }
-    else{
-      navigate("/signup")
-    }
+    
 	  } else {
 		console.log(responseData.Message);
 	  }
@@ -76,6 +69,21 @@ const Login = () => {
 	  console.error(error);
 	  setError("An error occurred during login. Please try again.");
 	}
+
+
+    console.log(responseData.role)
+		if(responseData.role === 'student')
+		navigate("/Profilesetting");
+		else if (responseData.role === 'teacher'){
+		navigate("/Profilesetting")
+		}
+    else if (responseData.role === 'admin'){ 
+      navigate("/AdminHomePage")
+    }
+    else if (responseData.role === 'superadmin'){ 
+      navigate("/SuperAdminPage")
+    }
+
   };
   
 

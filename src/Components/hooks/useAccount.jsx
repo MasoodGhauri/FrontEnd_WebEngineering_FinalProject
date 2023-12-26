@@ -1,17 +1,18 @@
 // store.js
-import create from 'zustand';
+import {create}from 'zustand';
 
-const useUserDataStore = create((set) => ({
+const useAccount = create((set) => ({
   data: {
-    firstname: '',
-    lastname: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     role: '',
     expertise: '',
+    profilePicture: '',
   },
   setData: (newData) => set((state) => ({ data: { ...state.data, ...newData } })),
   getData : () => set((state) => ({ data: { ...state.data } })),
 }));
 
-export default useUserDataStore;
+export default useAccount;

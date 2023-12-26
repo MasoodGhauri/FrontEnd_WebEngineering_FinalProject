@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from '../Login/Adnan.css';
 import { Link, useNavigate } from "react-router-dom";
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -19,6 +19,12 @@ const Subscription = () => {
   const [formError, setFormError] = useState('');
 
   const { firstname, lastname, email, role, expertise } = data;
+  console.log(firstname, lastname, email, role, expertise);
+  
+  useEffect(() => {
+    // Use the image path stored in Zustand
+    console.log("Profile Picture Path:", data.profilePicturePath);
+  }, [data.profilePicturePath]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,8 +72,8 @@ const Subscription = () => {
 			"Content-Type": "application/json",
 		  },
 		  body: JSON.stringify({
-			firstname: data.firstname,
-			lastname: data.lastname,
+			firstName: data.firstName,
+			lastName: data.lastName,
 			email: data.email,
 			password: data.password,
 			role: data.role,
@@ -75,6 +81,8 @@ const Subscription = () => {
 			cardNumber: accountdetails.cardNumber,
 			csvNumber: accountdetails.csvNumber,
 			cardHolderName: accountdetails.cardHolderName,
+			profilePicture: data.profilePicture,
+			accountbalance: 50,
 		  }),
 		});
   
@@ -83,15 +91,19 @@ const Subscription = () => {
 		}
   
 		const responseData = await response.json();
-		console.log(responseData);
+		//console.log(responseData);
+    if(responseData.role === 'student')
+	  window.alert('50$ have been deducted from your Account and the account has been created Successfully!');
+
+    else if(responseData.role === 'teacher')
+    window.alert('Your Account has been created Successfully!');
   
 	  } catch (error) {
 		console.error(error);
 		setError("An error occurred during registration. Please try again.");
 	  }
-  
-	  // Assuming successful account creation, display alert
-	  window.alert('50$ have been deducted from your account and the account has been created successfully!');
+
+    
 	  // Assuming you have a navigate function to handle navigation
 	  navigate("/login");
 	}

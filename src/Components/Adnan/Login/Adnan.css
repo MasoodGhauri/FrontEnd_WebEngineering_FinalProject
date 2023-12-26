@@ -444,3 +444,76 @@ border: none !important;
     	margin-top: 2em; 
     } 
 }
+
+/* ==========================================================================
+   Profile Section
+   ========================================================================== */
+.details {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	border: 2px solid #e0c3fc;
+	box-shadow: 0 0 10px #e0c3fc;
+	border-radius: 10px;
+	padding: 20px;
+  }
+  .details .top {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 20px;
+	padding-bottom: 0;
+  }
+  .details .top .userName {
+	margin: 0;
+	padding: 10px;
+	font-size: 50px;
+  }
+  .details .top .userName span {
+	font-size: 14px;
+	font-weight: 200;
+	cursor: default;
+  }
+  .followBtn {
+	height: 50px;
+	padding: 10px;
+	font-size: 16px;
+	border-radius: 10px;
+	border: none;
+	transition: transform 0.7s ease;
+  }
+  .followBtn:active {
+	transform: scale(0.7);
+  }
+  
+  .details .middle {
+	display: flex;
+	padding: 10px 20px;
+	gap: 80px;
+  }
+  
+  .middle p span {
+	margin-right: 20px;
+	font-size: 30px;
+	cursor: default;
+  }
+  .details .followWrap {
+	display: flex;
+	justify-content: space-around;
+	padding: 10px 40px;
+  }
+  .followWrap .followCol {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+  }
+  .details .followWrap hr {
+	border: 1px solid black;
+  }
+  .followCol .followNumber {
+	margin: 0;
+	font-size: 30px;
+  }
+  .followCol .followTag {
+	margin: 0 10px;
+  }
