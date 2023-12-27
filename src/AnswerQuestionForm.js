@@ -10,7 +10,6 @@ const BackendURL = "http://localhost:3000";
 const AnswerQuestionForm = () => {
   const [id, setId] = useState("");
   const [answeredBy, setAnsweredBy] = useState({ id: "", name: "" });
-  const [answerText, setAnswerText] = useState("");
   const [answerJSX, setAnswerJSX] = useState("");
   const [files, setFiles] = useState(null);
 
@@ -20,7 +19,9 @@ const AnswerQuestionForm = () => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-
+    const doc = new DOMParser().parseFromString(answerJSX, "text/html");
+    const textWithoutTags = doc.body.textContent || "";
+    const answerText = textWithoutTags;
     const formData = new FormData();
     formData.append("id", id);
     formData.append("answeredBy", JSON.stringify(answeredBy));
@@ -41,10 +42,10 @@ const AnswerQuestionForm = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Answer saved successfully:", data.Query);
+        console.log("Question answered successfully:", data.Query);
         // Handle success, e.g., show a success message or redirect
       } else {
-        console.error("Error saving answer");
+        console.error("Error answering question");
         // Handle error, e.g., show an error message
       }
     } catch (error) {
@@ -84,34 +85,21 @@ const AnswerQuestionForm = () => {
             </Form.Label>
             <ReactQuill
               theme="snow"
-              value={answerText}
-              onChange={setAnswerText}
+              value={answerJSX}
+              onChange={setAnswerJSX}
               style={{ height: "200px", marginTop: "5%" }}
             />
           </Form.Group>
+          <Form.Group className="fileUpload" controlId="formFileMultiple">
+            <Form.Label>Upload Files</Form.Label>
+            <Form.Control type="file" multiple onChange={handleFileChange} />
+          </Form.Group>
+
+          <Button variant="primary" type="submit">
+            Submit Answer
+          </Button>
         </Form>
       </Card.Body>
-
-      {/*  <Form.Group controlId="formAnswerJSX">
-        <Form.Label style={{ fontWeight: "bold", marginTop: "5%" }}>
-          Answer JSX
-        </Form.Label>
-        <ReactQuill
-          theme="snow"
-          value={answerJSX}
-          onChange={setAnswerJSX}
-          style={{ height: "200px", marginTop: "2%" }}
-        />
-      </Form.Group>
-*/}
-      <Form.Group className="fileUpload" controlId="formFileMultiple">
-        <Form.Label>Upload Files</Form.Label>
-        <Form.Control type="file" multiple onChange={handleFileChange} />
-      </Form.Group>
-
-      <Button variant="primary" type="submit">
-        Submit Answer
-      </Button>
     </Card>
   );
 };

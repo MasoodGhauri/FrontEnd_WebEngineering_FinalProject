@@ -1,4 +1,5 @@
-/*import logo from "./logo.svg";
+/**/
+import logo from "./logo.svg";
 import "./App.css";
 import PostQuestionForm from "./PostQuestionsForm";
 import AnswerQuestionForm from "./AnswerQuestionForm";
@@ -6,15 +7,15 @@ import QueryList from "./QuerySelection";
 function App() {
   return (
     <div className="App">
-      {/*<PostQuestionForm />}
+      {/*<PostQuestionForm />*/}
       {<AnswerQuestionForm />}
     </div>
   );
 }
 
 export default App;
-*/
 
+/*
 import React, { useState, useEffect } from "react";
 import QueryList from "./QuerySelection";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -46,4 +47,4 @@ const App = () => {
 };
 
 export default App;
-/**/
+*/
